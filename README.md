@@ -2,8 +2,8 @@
 
 [![JSR](https://jsr.io/badges/@kinbay/env)](https://jsr.io/@kinbay/env)
 [![JSR Score](https://jsr.io/badges/@kinbay/env/score)](https://jsr.io/@kinbay/env)
-![CI](https://github.com/keskinkaan/deno-env/actions/workflows/ci.yml/badge.svg)
-![GitHub](https://img.shields.io/github/license/keskinkaan/deno-env?color=blue)
+[![CI](https://github.com/keskinkaan/deno-env/actions/workflows/ci.yml/badge.svg)](https://github.com/keskinkaan/deno-env/actions/workflows/ci.yml)
+[![GitHub](https://img.shields.io/github/license/keskinkaan/deno-env?color=blue)](https://github.com/keskinkaan/deno-env/blob/dev/LICENSE)
 
 A type-safe environment variable loader for Deno with schema validation.
 
