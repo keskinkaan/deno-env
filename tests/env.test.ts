@@ -5,6 +5,7 @@ const root = Deno.cwd();
 
 Deno.test('ENV functionality tests', async (t) => {
 	await t.step('should fail when env file does not exist', async () => {
+		clearEnv();
 		const error = (await assertRejects(() =>
 			createEnv({
 				APP_ENV: {
@@ -20,6 +21,7 @@ Deno.test('ENV functionality tests', async (t) => {
 	});
 
 	await t.step('should throw error for missing required fields', async () => {
+		clearEnv();
 		const error = (await assertRejects(() =>
 			createEnv({
 				TEST_KEY: {
@@ -39,6 +41,7 @@ Deno.test('ENV functionality tests', async (t) => {
 	});
 
 	await t.step('should fail when value is not a valid number', async () => {
+		clearEnv();
 		const error = (await assertRejects(() =>
 			createEnv({
 				TEST_PORT: {
@@ -55,6 +58,7 @@ Deno.test('ENV functionality tests', async (t) => {
 	});
 
 	await t.step('should fail when value is not a valid boolean', async () => {
+		clearEnv();
 		const error = (await assertRejects(() =>
 			createEnv({
 				TEST_DEBUG: {
@@ -74,6 +78,7 @@ Deno.test('ENV functionality tests', async (t) => {
 	});
 
 	await t.step('should throw custom validation error', async () => {
+		clearEnv();
 		const error = (await assertRejects(() =>
 			createEnv({
 				APP_PORT: {

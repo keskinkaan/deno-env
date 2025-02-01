@@ -126,9 +126,17 @@ class Env {
 						const splitEnvFile = envFile.split('\n');
 						for (const line of splitEnvFile) {
 							if (!line || line.startsWith('#')) continue;
-							const [key, ...values] = line.split('=');
+
+							// First divide by = sign
+							const [key, ...valueParts] = line.split('=');
 							if (!key) continue;
-							const value = values.join('=').trim();
+
+							// Merge the value part
+							const fullValue = valueParts.join('=');
+
+							// Get the part up to the first space (or the entire value if there is no space)
+							const value = fullValue.split(' ')[0]?.trim() ?? '';
+
 							this.#env[key.trim()] = value.replace(/(^['"]|['"]$)/g, '');
 						}
 					} catch (error) {
