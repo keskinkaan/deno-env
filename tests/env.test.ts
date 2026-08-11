@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from 'jsr:@std/assert@^1.0.11';
+import { assertEquals, assertRejects } from '@std/assert';
 import { clearEnv, createEnv } from '../src/env.ts';
 
 const root = Deno.cwd();

@@ -28,7 +28,7 @@ A clear description of what actually happened.
 ## Code Example
 
 ```typescript
-import { createEnv } from '@kinbay/env';
+import { createEnv } from '@kaan/env';
 
 // Minimal code that reproduces the issue
 const config = await createEnv({

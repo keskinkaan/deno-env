@@ -1,9 +1,9 @@
-# @kinbay/env
+# @kaan/env
 
-[![JSR](https://jsr.io/badges/@kinbay/env)](https://jsr.io/@kinbay/env)
-[![JSR Score](https://jsr.io/badges/@kinbay/env/score)](https://jsr.io/@kinbay/env)
-[![CI](https://github.com/keskinkaan/deno-env/actions/workflows/ci.yml/badge.svg)](https://github.com/keskinkaan/deno-env/actions/workflows/ci.yml)
-[![GitHub](https://img.shields.io/github/license/keskinkaan/deno-env?color=blue)](https://github.com/keskinkaan/deno-env/blob/dev/LICENSE)
+[![JSR](https://jsr.io/badges/@kaan/env)](https://jsr.io/@kaan/env)
+[![JSR Score](https://jsr.io/badges/@kaan/env/score)](https://jsr.io/@kaan/env)
+[![CI](https://github.com/kaankeskin/deno-env/actions/workflows/ci.yml/badge.svg)](https://github.com/kaankeskin/deno-env/actions/workflows/ci.yml)
+[![GitHub](https://img.shields.io/github/license/kaankeskin/deno-env?color=blue)](https://github.com/kaankeskin/deno-env/blob/dev/LICENSE)
 
 A type-safe environment variable loader for Deno with schema validation.
 
@@ -20,7 +20,7 @@ A type-safe environment variable loader for Deno with schema validation.
 ## Installation
 
 ```sh
-deno add jsr:@kinbay/env
+deno add jsr:@kaan/env
 ```
 
 Add to your `deno.json`:
@@ -28,7 +28,7 @@ Add to your `deno.json`:
 ```json
 {
 	"imports": {
-		"@env": "jsr:@kinbay/env"
+		"@env": "jsr:@kaan/env"
 	}
 }
 ```
@@ -214,7 +214,6 @@ chmod +x .git/hooks/pre-commit
 ```
 
 5. Make your changes and ensure:
-
    - Code follows the existing style
    - Tests pass (`deno task test`)
    - Types are correct (`deno task check`)
