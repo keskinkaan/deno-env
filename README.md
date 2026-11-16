@@ -167,8 +167,12 @@ console.log(config.API_KEY); // your API key
 
 ### Clearing the Cache
 
-Use `clearEnv` to drop the cached configuration, for example in tests or when
-loading a different schema:
+Each `createEnv(...)` loader caches its own result: calling `load()` on the
+same loader again returns the cached config, while a new `createEnv(...)` call
+reads files and the environment again.
+
+Use `clearEnv` to drop the cached configuration of every loader, for example
+in tests:
 
 ```typescript
 import { clearEnv, createEnv } from '@env';
