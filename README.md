@@ -71,6 +71,23 @@ const config = await createEnv({
 });
 ```
 
+### How Values Are Resolved
+
+- Without `path`, `.env` in the current working directory is read.
+- When multiple files are given, later files override earlier ones.
+- System environment variables override file values. This needs
+  `--allow-env`; without it, only files are used and no permission prompt is
+  shown.
+- Quoted values keep their spaces and `#` characters.
+- For unquoted values, everything after ` #` is treated as a comment.
+
+```sh
+# .env
+APP_NAME="My App"          # → My App
+APP_TAG='v1 # beta'        # → v1 # beta
+APP_PORT=3000 # dev port   # → 3000
+```
+
 ### Custom Validation
 
 ```typescript
@@ -146,6 +163,17 @@ async function connectToPostgres() {
 // api.ts
 import { config } from './env.ts';
 console.log(config.API_KEY); // your API key
+```
+
+### Clearing the Cache
+
+Use `clearEnv` to drop the cached configuration, for example in tests or when
+loading a different schema:
+
+```typescript
+import { clearEnv, createEnv } from '@env';
+
+clearEnv(); // the next load() reads files and the environment again
 ```
 
 ## API Reference
