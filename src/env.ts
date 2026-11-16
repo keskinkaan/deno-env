@@ -23,6 +23,67 @@ class Env {
 	}
 
 	/**
+	 * Parses the contents of a .env file
+	 * @private
+	 * @param {string} content - Raw file content
+	 * @returns {Record<string, string>} Parsed key/value pairs
+	 * @description Quoted values keep their inner spaces and `#` characters.
+	 * For unquoted values, everything after ` #` is treated as a comment.
+	 */
+	static #parseEnvFile(content: string): Record<string, string> {
+		const result: Record<string, string> = {};
+
+		for (const rawLine of content.split(/\r?\n/)) {
+			const line = rawLine.trim();
+			if (!line || line.startsWith('#')) continue;
+
+			// Divide by the first = sign
+			const separatorIndex = line.indexOf('=');
+			if (separatorIndex < 1) continue;
+
+			const key = line.slice(0, separatorIndex).trim();
+			const rawValue = line.slice(separatorIndex + 1).trim();
+			const quote = rawValue[0];
+
+			// Quoted value: take everything up to the matching closing quote
+			if (quote === '"' || quote === "'") {
+				const closingIndex = rawValue.indexOf(quote, 1);
+				if (closingIndex !== -1) {
+					result[key] = rawValue.slice(1, closingIndex);
+					continue;
+				}
+			}
+
+			// Unquoted value: strip an inline comment
+			const commentMatch = rawValue.match(/(^|\s)#/);
+			result[key] = commentMatch
+				? rawValue.slice(0, commentMatch.index).trim()
+				: rawValue;
+		}
+
+		return result;
+	}
+
+	/**
+	 * Reads a system environment variable without prompting for permission
+	 * @private
+	 * @param {string} key - Variable name
+	 * @returns {string|undefined} The value, or undefined when unset or not permitted
+	 */
+	static #readSystemEnv(key: string): string | undefined {
+		try {
+			const { state } = Deno.permissions.querySync({
+				name: 'env',
+				variable: key,
+			});
+			if (state !== 'granted') return undefined;
+			return Deno.env.get(key);
+		} catch {
+			return undefined;
+		}
+	}
+
+	/**
 	 * Validates environment variables against provided schema
 	 * @private
 	 * @param {TSchema} schema - Schema to validate against
@@ -116,40 +177,30 @@ class Env {
 
 			let foundAnyFile = false;
 
-			// If path is provided, read files
-			if (options.path) {
-				for (const path of paths) {
-					try {
-						const envFile = await Deno.readTextFile(path);
-						foundAnyFile = true;
-
-						const splitEnvFile = envFile.split('\n');
-						for (const line of splitEnvFile) {
-							if (!line || line.startsWith('#')) continue;
-
-							// First divide by = sign
-							const [key, ...valueParts] = line.split('=');
-							if (!key) continue;
-
-							// Merge the value part
-							const fullValue = valueParts.join('=');
-
-							// Get the part up to the first space (or the entire value if there is no space)
-							const value = fullValue.split(' ')[0]?.trim() ?? '';
-
-							this.#env[key.trim()] = value.replace(/(^['"]|['"]$)/g, '');
-						}
-					} catch (error) {
-						if (error instanceof Deno.errors.NotFound) {
-							continue;
-						}
-						throw error;
+			// Read files (defaults to .env when no path is provided)
+			for (const path of paths) {
+				try {
+					const envFile = await Deno.readTextFile(path);
+					foundAnyFile = true;
+					Object.assign(this.#env, Env.#parseEnvFile(envFile));
+				} catch (error) {
+					if (error instanceof Deno.errors.NotFound) {
+						continue;
 					}
+					throw error;
 				}
+			}
 
-				// Throw error if path is provided but no file is found in strict mode
-				if (!foundAnyFile && options.strict) {
-					throw new Error('No environment file found');
+			// Throw error if path is provided but no file is found in strict mode
+			if (options.path && !foundAnyFile && options.strict) {
+				throw new Error('No environment file found');
+			}
+
+			// System environment variables take precedence over file values
+			for (const key of Object.keys(options.schema)) {
+				const value = Env.#readSystemEnv(key);
+				if (value !== undefined) {
+					this.#env[key] = value;
 				}
 			}
 

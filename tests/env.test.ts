@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects } from '@std/assert';
 import { clearEnv, createEnv } from '../src/env.ts';
+import { clearEnv as modClearEnv } from '../mod.ts';
 
 const root = Deno.cwd();
 
@@ -208,4 +209,63 @@ Deno.test('ENV functionality tests', async (t) => {
 			assertEquals(config.DEBUG, false);
 		},
 	);
+
+	await t.step('should keep spaces and # inside quoted values', async () => {
+		clearEnv();
+		const config = await createEnv({
+			QUOTED_DOUBLE: { type: 'string' },
+			QUOTED_SINGLE: { type: 'string' },
+			QUOTED_HASH: { type: 'string' },
+			UNQUOTED_SPACES: { type: 'string' },
+			APP_PORT: { type: 'number' },
+		}).load({
+			path: `${root}/tests/.env.test`,
+		});
+
+		assertEquals(config.QUOTED_DOUBLE, 'My App');
+		assertEquals(config.QUOTED_SINGLE, 'Single Quoted');
+		assertEquals(config.QUOTED_HASH, 'abc # not a comment');
+		assertEquals(config.UNQUOTED_SPACES, 'hello world');
+		assertEquals(config.APP_PORT, 3000);
+	});
+
+	await t.step(
+		'should read .env from the working directory when no path is provided',
+		async () => {
+			clearEnv();
+			Deno.chdir(`${root}/tests/default`);
+			try {
+				const config = await createEnv({
+					DEFAULT_KEY: { type: 'string', required: true },
+				}).load();
+
+				assertEquals(config.DEFAULT_KEY, 'from_default_file');
+			} finally {
+				Deno.chdir(root);
+			}
+		},
+	);
+
+	await t.step(
+		'should prefer system environment variables over file values',
+		async () => {
+			clearEnv();
+			Deno.env.set('SHARED_KEY', 'from_system');
+			try {
+				const config = await createEnv({
+					SHARED_KEY: { type: 'string', required: true },
+				}).load({
+					path: `${root}/tests/default/.env`,
+				});
+
+				assertEquals(config.SHARED_KEY, 'from_system');
+			} finally {
+				Deno.env.delete('SHARED_KEY');
+			}
+		},
+	);
+
+	await t.step('should export clearEnv from the module entry', () => {
+		assertEquals(typeof modClearEnv, 'function');
+	});
 });
