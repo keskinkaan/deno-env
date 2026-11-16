@@ -7,9 +7,8 @@ import type { TSchema, TypeMap } from './types/mod.ts';
  */
 class Env {
 	static #instance: Env;
-	#config: Record<string, unknown> = {};
-	#loadedConfig: Record<string, unknown> | null = null;
-	#env: Record<string, string> = {};
+	// Incremented by clearEnv to invalidate every loader's cache
+	#generation = 0;
 
 	/**
 	 * Gets singleton instance of Env class
@@ -87,14 +86,15 @@ class Env {
 	 * Validates environment variables against provided schema
 	 * @private
 	 * @param {TSchema} schema - Schema to validate against
+	 * @param {Record<string, string>} env - Raw values collected from files and the system
 	 * @returns {Object} Parsed values and validation errors
 	 */
-	#validateSchema(schema: TSchema) {
+	#validateSchema(schema: TSchema, env: Record<string, string>) {
 		const errors: string[] = [];
 		const parsed: Record<string, unknown> = {};
 
 		for (const [key, definition] of Object.entries(schema)) {
-			const value = this.#env[key];
+			const value = env[key];
 
 			if (definition.required && !value) {
 				errors.push(`Missing required environment variable: ${key}`);
@@ -165,67 +165,57 @@ class Env {
 		schema: TSchema;
 		strict?: boolean;
 	}) {
-		try {
-			// Clear cache in case of error
-			this.#loadedConfig = null;
-			this.#env = {};
-			this.#config = {};
+		// Local per call, so concurrent loads never share state
+		const env: Record<string, string> = {};
 
-			const paths = Array.isArray(options.path)
-				? options.path
-				: [options.path || '.env'];
+		const paths = Array.isArray(options.path)
+			? options.path
+			: [options.path || '.env'];
 
-			let foundAnyFile = false;
+		let foundAnyFile = false;
 
-			// Read files (defaults to .env when no path is provided)
-			for (const path of paths) {
-				try {
-					const envFile = await Deno.readTextFile(path);
-					foundAnyFile = true;
-					Object.assign(this.#env, Env.#parseEnvFile(envFile));
-				} catch (error) {
-					if (error instanceof Deno.errors.NotFound) {
-						continue;
-					}
-					throw error;
+		// Read files (defaults to .env when no path is provided)
+		for (const path of paths) {
+			try {
+				const envFile = await Deno.readTextFile(path);
+				foundAnyFile = true;
+				Object.assign(env, Env.#parseEnvFile(envFile));
+			} catch (error) {
+				if (error instanceof Deno.errors.NotFound) {
+					continue;
 				}
+				throw error;
 			}
-
-			// Throw error if path is provided but no file is found in strict mode
-			if (options.path && !foundAnyFile && options.strict) {
-				throw new Error('No environment file found');
-			}
-
-			// System environment variables take precedence over file values
-			for (const key of Object.keys(options.schema)) {
-				const value = Env.#readSystemEnv(key);
-				if (value !== undefined) {
-					this.#env[key] = value;
-				}
-			}
-
-			const { parsed, errors } = this.#validateSchema(options.schema);
-
-			// Error checking, regardless of strict mode
-			if (errors.length > 0) {
-				throw new Error(errors.join('\n'));
-			}
-
-			this.#config = parsed;
-			return this.#config;
-		} catch (error) {
-			// Clear cache in case of error
-			this.#loadedConfig = null;
-			this.#env = {};
-			this.#config = {};
-			throw error;
 		}
+
+		// Throw error if path is provided but no file is found in strict mode
+		if (options.path && !foundAnyFile && options.strict) {
+			throw new Error('No environment file found');
+		}
+
+		// System environment variables take precedence over file values
+		for (const key of Object.keys(options.schema)) {
+			const value = Env.#readSystemEnv(key);
+			if (value !== undefined) {
+				env[key] = value;
+			}
+		}
+
+		const { parsed, errors } = this.#validateSchema(options.schema, env);
+
+		// Error checking, regardless of strict mode
+		if (errors.length > 0) {
+			throw new Error(errors.join('\n'));
+		}
+
+		return parsed;
 	}
 
 	/**
 	 * Clears cached environment configuration
 	 * @static
-	 * @description Clears the cached environment configuration
+	 * @description Clears the cached configuration of every loader, so the
+	 * next load() reads files and the environment again
 	 * @example
 	 * ```ts
 	 * clearEnv();
@@ -233,10 +223,7 @@ class Env {
 	 * @returns {void}
 	 */
 	public static clearEnv() {
-		const env = Env.getInstance();
-		env.#loadedConfig = null;
-		env.#env = {};
-		env.#config = {};
+		Env.getInstance().#generation++;
 	}
 
 	/**
@@ -269,13 +256,18 @@ class Env {
 			}
 		>;
 	} => {
+		// Cache belongs to this loader only, so a new createEnv() call with a
+		// different schema always reads its own values
+		let loadedConfig: Record<string, unknown> | null = null;
+		let loadedGeneration = -1;
+
 		return {
 			load: async (options?) => {
 				const env = Env.getInstance();
 
-				// If config is already loaded, revert it
-				if (env.#loadedConfig) {
-					return env.#loadedConfig as {
+				// If config is already loaded and not cleared, return it
+				if (loadedConfig && loadedGeneration === env.#generation) {
+					return loadedConfig as {
 						[K in keyof T]: T[K] extends { type: infer Type }
 							? Type extends keyof TypeMap ? TypeMap[Type]
 							: never
@@ -283,10 +275,12 @@ class Env {
 					};
 				}
 
+				const generation = env.#generation;
 				const config = await env.#load({ schema, ...options });
 
 				// Cache config
-				env.#loadedConfig = new Proxy(config, {
+				loadedGeneration = generation;
+				loadedConfig = new Proxy(config, {
 					get(target: typeof config, prop: string) {
 						if (prop === 'then') {
 							return undefined;
@@ -302,7 +296,7 @@ class Env {
 					},
 				});
 
-				return env.#loadedConfig as {
+				return loadedConfig as {
 					[K in keyof T]: T[K] extends { type: infer Type }
 						? Type extends keyof TypeMap ? TypeMap[Type]
 						: never

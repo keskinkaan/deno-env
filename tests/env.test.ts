@@ -268,4 +268,74 @@ Deno.test('ENV functionality tests', async (t) => {
 	await t.step('should export clearEnv from the module entry', () => {
 		assertEquals(typeof modClearEnv, 'function');
 	});
+
+	await t.step(
+		'should run the bug report reproduction as written',
+		async () => {
+			clearEnv();
+			Deno.chdir(`${root}/tests/report`);
+			try {
+				//- Same calls as the report, without clearEnv in between
+				await createEnv({
+					API_KEY: { type: 'string', required: true },
+				}).load();
+
+				const config = await createEnv({
+					API_KEY: { type: 'string', required: true },
+					APP_NAME: { type: 'string', required: true },
+				}).load({ path: '.env' });
+
+				assertEquals({ ...config }, {
+					API_KEY: 'secret123',
+					APP_NAME: 'My App',
+				});
+			} finally {
+				Deno.chdir(root);
+			}
+		},
+	);
+
+	await t.step('should cache results per loader', async () => {
+		clearEnv();
+		const loader = createEnv({ CACHE_KEY: { type: 'string' } });
+
+		Deno.env.set('CACHE_KEY', 'first');
+		try {
+			const first = await loader.load();
+			Deno.env.set('CACHE_KEY', 'second');
+
+			//- Same loader returns the cached result
+			const cached = await loader.load();
+			assertEquals(cached, first);
+			assertEquals(cached.CACHE_KEY, 'first');
+
+			//- A new loader reads again
+			const fresh = await createEnv({
+				CACHE_KEY: { type: 'string' },
+			}).load();
+			assertEquals(fresh.CACHE_KEY, 'second');
+
+			//- clearEnv invalidates every loader's cache
+			clearEnv();
+			const reloaded = await loader.load();
+			assertEquals(reloaded.CACHE_KEY, 'second');
+		} finally {
+			Deno.env.delete('CACHE_KEY');
+		}
+	});
+
+	await t.step('should not mix values between concurrent loads', async () => {
+		clearEnv();
+		const [a, b] = await Promise.all([
+			createEnv({ APP_ENV: { type: 'string' } }).load({
+				path: `${root}/tests/.env.test`,
+			}),
+			createEnv({ DEFAULT_KEY: { type: 'string' } }).load({
+				path: `${root}/tests/default/.env`,
+			}),
+		]);
+
+		assertEquals({ ...a }, { APP_ENV: 'development' });
+		assertEquals({ ...b }, { DEFAULT_KEY: 'from_default_file' });
+	});
 });
