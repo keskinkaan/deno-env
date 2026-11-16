@@ -1,6 +1,6 @@
 {
 	"name": "@kaan/env",
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"description": "A simple environment variable loader for Deno",
 	"license": "MIT",
 	"exports": {
